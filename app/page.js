@@ -1,101 +1,234 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import React, { useState, useEffect } from 'react';
+import {
+  ComposableMap,
+  Geographies,
+  Geography,
+  ZoomableGroup
+} from 'react-simple-maps';
+import { scaleLinear } from 'd3-scale';
+import { geoCentroid } from 'd3-geo';
+import {
+  Box,
+  Typography,
+  CircularProgress,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Snackbar,
+  Alert,
+  Paper,
+  Tooltip
+} from '@mui/material';
+import ZoomInIcon from '@mui/icons-material/ZoomIn';
+import ZoomOutIcon from '@mui/icons-material/ZoomOut';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import InfoIcon from '@mui/icons-material/Info';
+
+const geoUrl = "https://raw.githubusercontent.com/apisit/thailand.json/master/thailand.json";
+
+export default function CovidDeathsMap() {
+  // State สำหรับข้อมูล API
+  const [data, setData] = useState({});
+  const [updateDate, setUpdateDate] = useState("");
+  const [maxDeaths, setMaxDeaths] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // State สำหรับควบคุมการซูมและจังหวัดที่เลือก
+  const [position, setPosition] = useState({ coordinates: [100.5, 13.75], zoom: 15 });
+  const [selectedProvince, setSelectedProvince] = useState(null);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+
+  // ดึงข้อมูลจาก API
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/covid-deaths');
+        const json = await res.json();
+        if (json.error) {
+          throw new Error(json.error);
+        }
+        if (!json.deathsByProvince || !json.update_date) {
+          throw new Error("Invalid data structure: Missing deathsByProvince or update_date");
+        }
+        setData(json.deathsByProvince);
+        setUpdateDate(json.update_date);
+        setMaxDeaths(Math.max(...Object.values(json.deathsByProvince), 1));
+      } catch (err) {
+        setError(err.message);
+        setSnackbarOpen(true);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // กำหนดสีจากจำนวนผู้เสียชีวิต
+  const colorScale = scaleLinear()
+    .domain([0, maxDeaths])
+    .range(['#ffcccc', '#ff0000']);
+
+  // เมื่อคลิกที่จังหวัด
+  const handleProvinceClick = (geo, deaths) => {
+    const centroid = geoCentroid(geo);
+    setPosition({ coordinates: centroid, zoom: 4 });
+    setSelectedProvince({ name: geo.properties.name, deaths });
+  };
+
+  // รีเซ็ตกลับไปที่มุมมองเริ่มต้น
+  const handleReset = () => {
+    setPosition({ coordinates: [100.5, 13.75], zoom: 15 });
+    setSelectedProvince(null);
+  };
+
+  // ฟังก์ชันซูมเข้า/ออก
+  const handleZoomIn = () => {
+    setPosition(prev => ({ ...prev, zoom: prev.zoom * 1.5 }));
+  };
+
+  const handleZoomOut = () => {
+    setPosition(prev => ({ ...prev, zoom: prev.zoom / 1.5 }));
+  };
+
+  const handleSnackbarClose = (event, reason) => {
+    if (reason === 'clickaway') return;
+    setSnackbarOpen(false);
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.js
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <Box sx={{ p: 4, bgcolor: '#f5f5f5', minHeight: '100vh' }}>
+      <Typography variant="h4" component="h1" align="center" gutterBottom>
+        แผนที่จำนวนผู้เสียชีวิตจาก COVID-19
+      </Typography>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+          <CircularProgress />
+        </Box>
+      ) : error ? (
+        <Typography variant="h6" color="error" align="center">
+          {error}
+        </Typography>
+      ) : (
+        <>
+          <Typography variant="subtitle1" align="center" color="textSecondary" gutterBottom>
+            อัปเดตข้อมูลล่าสุด: {updateDate || "ไม่พบข้อมูล"}
+          </Typography>
+
+          <Paper
+            elevation={3}
+            sx={{
+              position: 'relative',
+              maxWidth: 800,
+              margin: '0 auto',
+              p: 2,
+              borderRadius: 2,
+              bgcolor: '#fdf'
+            }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+            {/* ปุ่มควบคุมซูม */}
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 16,
+                right: 16,
+                bgcolor: 'rgba(255,255,255,0.9)',
+                borderRadius: 1,
+                boxShadow: 1,
+                zIndex: 10,
+                display: 'flex',
+                flexDirection: 'column'
+              }}
+            >
+              <Tooltip title="ซูมเข้า" placement="left">
+                <IconButton onClick={handleZoomIn} aria-label="Zoom In">
+                  <ZoomInIcon />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="ซูมออก" placement="left">
+                <IconButton onClick={handleZoomOut} aria-label="Zoom Out">
+                  <ZoomOutIcon />
+                </IconButton>
+              </Tooltip>
+              {selectedProvince && (
+                <Tooltip title="รีเซ็ต" placement="left">
+                  <IconButton onClick={handleReset} aria-label="Reset">
+                    <RefreshIcon />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </Box>
+
+            <ComposableMap projection="geoMercator">
+              <ZoomableGroup center={position.coordinates} zoom={position.zoom}>
+                <Geographies geography={geoUrl}>
+                  {({ geographies }) =>
+                    geographies.map((geo) => {
+                      const provinceName = geo.properties.name;
+                      const deaths = data[provinceName] || 0;
+                      return (
+                        <Tooltip key={geo.rsmKey} title={`${provinceName}: ${deaths} ราย`} arrow>
+                          <Geography
+                            geography={geo}
+                            fill={colorScale(deaths)}
+                            stroke="#ffcf"
+                            strokeWidth={0.1}
+                            onClick={() => handleProvinceClick(geo, deaths)}
+                            style={{
+                              default: { outline: 'none' },
+                              hover: { fill: '#666', outline: 'none', cursor: 'pointer' },
+                              pressed: { fill: '#222', outline: 'none' }
+                            }}
+                          />
+                        </Tooltip>
+                      );
+                    })
+                  }
+                </Geographies>
+              </ZoomableGroup>
+            </ComposableMap>
+          </Paper>
+
+          {/* Dialog แสดงรายละเอียดจังหวัด */}
+          <Dialog open={Boolean(selectedProvince)} onClose={handleReset} fullWidth maxWidth="sm">
+            <DialogTitle>
+              รายละเอียดจังหวัด {selectedProvince?.name}
+            </DialogTitle>
+            <DialogContent dividers>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <InfoIcon color="primary" sx={{ mr: 1 }} />
+                <Typography variant="h6">
+                  จำนวนผู้เสียชีวิต: {selectedProvince?.deaths} ราย
+                </Typography>
+              </Box>
+              {/* สามารถเพิ่มข้อมูลเพิ่มเติมหรือคำอธิบายเกี่ยวกับสถานการณ์ได้ที่นี่ */}
+              <Typography variant="body1">
+                ข้อมูลเพิ่มเติมเกี่ยวกับสถานการณ์และมาตรการป้องกันสามารถแสดงที่นี่
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleReset} color="primary">
+                กลับสู่แผนที่
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Snackbar แจ้ง Error */}
+          <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleSnackbarClose}>
+            <Alert onClose={handleSnackbarClose} severity="error" sx={{ width: '100%' }}>
+              {error}
+            </Alert>
+          </Snackbar>
+        </>
+      )}
+    </Box>
   );
 }
