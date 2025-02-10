@@ -83,7 +83,7 @@ export default function CovidDeathsMap() {
     setSelectedProvince({ name: geo.properties.name, deaths });
   };
 
-  // รีเซ็ตกลับไปที่มุมมองเริ่มต้น
+  // รีเซ็ตกลับไปที่มุมมองเริ่มต้นs
   const handleReset = () => {
     setPosition({ coordinates: [100.5, 13.75], zoom: 15 });
     setSelectedProvince(null);
