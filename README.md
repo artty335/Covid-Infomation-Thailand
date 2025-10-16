@@ -1,4 +1,4 @@
-# Data COVID-19 Death Dashboard
+## Data COVID-19 Death Dashboard
 
 [![Vercel Deployment](https://img.shields.io/badge/Deployed-Vercel-blue?logo=vercel)](https://data-covid-19-death.vercel.app/)
 
