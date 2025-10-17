@@ -32,7 +32,7 @@ import InfoIcon from '@mui/icons-material/Info';
 const geoUrl = "https://raw.githubusercontent.com/apisit/thailand.json/master/thailand.json";
 
 export default function CovidDeathsMap() {
-  // State สำหรับข้อมูล API
+  // State สำหรับข้อมูล APIi
   const [data, setData] = useState({});
   const [updateDate, setUpdateDate] = useState("");
   const [maxDeaths, setMaxDeaths] = useState(1);
